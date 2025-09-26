@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Colombo Fantacy</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="splash">
+  <img src="splash.png" alt="App Logo" />
+  </div>
+  <div class="app">
+    <header class="topbar">
+      <button class="menu-btn" aria-label="menu">☰</button>
+      <div class="logo-wrap">
+        <img id="logoImg" src="logo.png" alt="Logo" />
+      </div>
+      <div class="tabs">
+        <button id="tab-online" class="tab active">Online</button>
+        <button id="tab-all" class="tab">All</button>
+      </div>
+    </header>
+
+    <main class="content">
+      <div class="list-wrap" id="chatListWrap">
+        <div id="onlineSection" class="section"></div>
+        <div id="allSection" class="section hidden"></div>
+      </div>
+    </main>
+
+    <!-- Chat overlay UI -->
+    <aside id="chatPanel" class="chat-panel hidden" aria-hidden="true">
+      <div class="chat-header">
+        <button id="backBtn" class="back-btn">←</button>
+        <div class="chat-title">
+          <img id="chatAvatar" class="chat-avatar" src="profile1.png" alt="avatar" />
+          <div>
+            <div id="chatName" class="chat-name">Ashawaree</div>
+            <div id="chatMeta" class="chat-meta">24 · Nugegoda</div>
+          </div>
+        </div>
+        <div class="chat-actions">
+          <button id="adOnlyBtn" class="ad-only-btn" title="Open ad in new tab">Ad</button>
+        </div>
+      </div>
+
+      <div id="messages" class="messages"></div>
+
+      <div class="compose">
+        <input id="messageInput" placeholder="Type a message..." />
+        <button id="sendBtn">Send</button>
+      </div>
+    </aside>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
