@@ -3,7 +3,7 @@ const config = {
   logo: "logo.png",
   background: "background.png",
   profiles: [
-    { id: "p1", name: "Ashawaree", age: 24, location: "Nugegoda", phone: "+94 70745871", img: "profiles/profile1.png", online: true },
+    { id: "p1", name: "Sihilal Nimsara", age: 24, location: "Nugegoda", phone: "+94 70745871", img: "profiles/profile1.png", online: true },
     { id: "p2", name: "Shanika", age: 25, location: "Baththaramulla", phone: "+94 71724899", img: "profiles/profile2.png", online: true },
     { id: "p3", name: "Niluka", age: 29, location: "Wellawatte", phone: "+94 77328556", img: "profiles/profile3.png", online: true },
     { id: "p4", name: "Sheron", age: 31, location: "Rajagiriya", phone: "+94 77728823", img: "profiles/profile4.png", online: true },
@@ -115,3 +115,4 @@ window.addEventListener("load", () => {
     }, 800); // delay so splash is visible for ~0.8s
   }
 });
+
