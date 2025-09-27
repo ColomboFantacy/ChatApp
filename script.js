@@ -13,12 +13,20 @@ const config = {
     { id: "p8", name: "Sachini", age: 27, location: "Pelawatte", phone: "+94 77346554", img: "profiles/profile8.png", online: false },
     { id: "p9", name: "Amanda", age: 26, location: "Galkissa", phone: "+94 76254982", img: "profiles/profile9.png", online: false },
     { id: "p10", name: "Thaaru", age: 24, location: "Rathmalana", phone: "+94 77719198", img: "profiles/profile10.png", online: false },
-  ]
+  ],
+  // Per-online-profile auto replies (you can replace these texts)
+  autoReplies: {
+    p1: { first: "Hi Hi මගේ චූටි වේ# කොල්ලෝ..🥵🍆💦", second: "ආස නැද්ද අනේ මට කියලා ඇරගන්න🥺 ආසයි නම් WhatsApp num එක එවන්න මං ඒකෙන් message කරන්නම් 🤤🫦" },
+    p2: { first: "මොකෝ වෙන්නේ ඉතින්..🤭 ආසද මට කියලා නග්ගගන්න.😏🖕🏻", second: "මාත් මෝල් වෙලා ඉන්නේ හොඳටම🥵😖" },
+    p3: { first: " Hi කොහොමද මගේ හුතු පැටියට 🙈🍆", second: "මන් නම් හොඳින් නෙමේ මගේ කිම්බ නලියනෝ ඇරගන්න කවුරුත් නැතුව😫🖕🏻" },
+    p4: { first: "ඔයා කැමතිද meet වෙන්න..Room එක මං ගානේ 😁🫦", second: "පැයකට 500යි.. ශොට් unlimited😏💦" },
+    p5: { first: "Hi මොකෝ කරන්නේ 🤤💦", second: "මම නම් මේ ඇඟිල්ලක් ගහන ගමන් ඉන්නේ 🫦🖕🏻💦" }
+  }
 };
 
-// Persisted chat storage
+/* ========= Chat persistence (localStorage) ========= */
 const STORAGE_KEY = "cf_chat_store_v1";
-let currentChatId = null;
+const AUTO_KEY = "cf_chat_auto_v1";
 
 function getStore() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
@@ -42,21 +50,31 @@ function addMessage(profileId, msg) {
   saveMessages(profileId, msgs);
 }
 
-function createMsgElement({ role, text }) {
-  const el = document.createElement("div");
-  el.className = "msg " + (role === "outgoing" ? "outgoing" : "incoming");
-  el.textContent = text;
-  return el;
+/* Track auto-reply steps per profile (so we send only twice) */
+function getAutoProgress() {
+  try { return JSON.parse(localStorage.getItem(AUTO_KEY)) || {}; }
+  catch { return {}; }
+}
+function setAutoProgress(obj) {
+  localStorage.setItem(AUTO_KEY, JSON.stringify(obj));
+}
+function hasStep(profileId, step) {
+  const s = getAutoProgress();
+  return !!(s[profileId] && s[profileId][step]);
+}
+function markStep(profileId, step) {
+  const s = getAutoProgress();
+  if (!s[profileId]) s[profileId] = {};
+  s[profileId][step] = true;
+  setAutoProgress(s);
 }
 
-function renderConversation(profileId) {
-  const msgsEl = document.getElementById("messages");
-  msgsEl.innerHTML = "";
-  const msgs = getMessages(profileId);
-  msgs.forEach(m => msgsEl.appendChild(createMsgElement(m)));
-  msgsEl.scrollTop = msgsEl.scrollHeight;
-}
+/* ========= UI state ========= */
+let currentChatId = null;
+let currentProfile = null;
+let autoReplyTimer = null;
 
+/* ========= Boot ========= */
 document.addEventListener("DOMContentLoaded", () => {
   const logoImg = document.getElementById("logoImg");
   if (logoImg) logoImg.src = config.logo;
@@ -66,6 +84,7 @@ document.addEventListener("DOMContentLoaded", () => {
   setupChatControls();
 });
 
+/* ========= Render cards ========= */
 function renderLists(){
   const online = document.getElementById("onlineSection");
   const all = document.getElementById("allSection");
@@ -95,6 +114,7 @@ function makeCard(p){
   return card;
 }
 
+/* ========= Tabs ========= */
 function setupTabs(){
   const t1=document.getElementById("tab-online");
   const t2=document.getElementById("tab-all");
@@ -110,22 +130,31 @@ function setupTabs(){
   });
 }
 
+/* ========= Chat controls ========= */
 function setupChatControls(){
   document.getElementById("backBtn").addEventListener("click",hideChat);
   document.getElementById("adOnlyBtn").addEventListener("click",()=>window.open(config.adLink,"_blank"));
   document.getElementById("sendBtn").addEventListener("click",sendMessage);
-  document.getElementById("messageInput").addEventListener("keydown",(e)=>{if(e.key==="Enter")sendMessage();});
+  document.getElementById("messageInput").addEventListener("keydown",(e)=>{
+    if(e.key==="Enter"){ e.preventDefault(); sendMessage(); }
+  });
 }
 
-function openChat(p) {
+/* ========= Chat open/close ========= */
+function openChat(p){
   currentChatId = p.id;
+  currentProfile = p;
 
-  const panel = document.getElementById("chatPanel");
-  document.getElementById("chatAvatar").src = p.img;
-  document.getElementById("chatName").textContent = p.name;
-  document.getElementById("chatMeta").textContent = `Age: ${p.age} · ${p.location}`;
+  const panel=document.getElementById("chatPanel");
+  document.getElementById("chatAvatar").src=p.img;
+  document.getElementById("chatName").textContent=p.name;
+  document.getElementById("chatMeta").textContent=`Age: ${p.age} · ${p.location}`;
 
-  // Seed first-time chat with initial messages
+  // cancel any previous typing timers and hide indicator
+  if (autoReplyTimer) { clearTimeout(autoReplyTimer); autoReplyTimer = null; }
+  hideTypingIndicator();
+
+  // seed first-time chat
   let msgs = getMessages(p.id);
   if (!msgs.length) {
     msgs = [
@@ -139,40 +168,128 @@ function openChat(p) {
 
   panel.classList.add("show");
   panel.classList.remove("hidden");
+  panel.setAttribute("aria-hidden","false");
 }
 
 function hideChat(){
   const panel=document.getElementById("chatPanel");
   panel.classList.remove("show");
   setTimeout(()=>panel.classList.add("hidden"),300);
-  currentChatId = null; // optional, just to be explicit
+  panel.setAttribute("aria-hidden","true");
+
+  if (autoReplyTimer) { clearTimeout(autoReplyTimer); autoReplyTimer = null; }
+  hideTypingIndicator();
+
+  currentChatId = null;
+  currentProfile = null;
 }
 
-function sendMessage() {
-  const input = document.getElementById("messageInput");
-  const text = input.value.trim();
-  if (!text || !currentChatId) return;
+/* ========= Messages UI ========= */
+function createMsgElement({ role, text }) {
+  const el = document.createElement("div");
+  el.className = "msg " + (role === "outgoing" ? "outgoing" : "incoming");
+  el.textContent = text;
+  return el;
+}
 
+function renderConversation(profileId) {
+  const msgsEl = document.getElementById("messages");
+  msgsEl.innerHTML = "";
+  const msgs = getMessages(profileId);
+  msgs.forEach(m => msgsEl.appendChild(createMsgElement(m)));
+  msgsEl.scrollTop = msgsEl.scrollHeight;
+}
+
+/* ========= Typing indicator ========= */
+function showTypingIndicator() {
+  const bar = document.getElementById("typingIndicator");
+  if (bar) bar.classList.remove("hidden");
+}
+function hideTypingIndicator() {
+  const bar = document.getElementById("typingIndicator");
+  if (bar) bar.classList.add("hidden");
+}
+
+/* ========= Auto-reply logic ========= */
+function scheduleAutoReply(step) {
+  // Only for online profiles with configured replies
+  if (!currentProfile || !currentProfile.online) return;
+  const replies = (config.autoReplies || {})[currentProfile.id];
+  if (!replies || !replies[step]) return;
+
+  // Prevent stacking multiple timers
+  if (autoReplyTimer) return;
+
+  showTypingIndicator();
+  autoReplyTimer = setTimeout(() => {
+    autoReplyTimer = null;
+    hideTypingIndicator();
+
+    const text = replies[step];
+    const msgObj = { role: "incoming", text, ts: Date.now() };
+
+    // Persist and update UI
+    if (currentChatId) {
+      addMessage(currentChatId, msgObj);
+      const msgsEl = document.getElementById("messages");
+      if (msgsEl) {
+        msgsEl.appendChild(createMsgElement(msgObj));
+        msgsEl.scrollTop = msgsEl.scrollHeight;
+      }
+      markStep(currentChatId, step);
+
+      // If we just completed first reply and user already sent >= 2 messages,
+      // queue second reply automatically (with its own 5s typing).
+      if (step === "first") {
+        const totalOutgoing = getMessages(currentChatId).filter(m => m.role === "outgoing").length;
+        if (!hasStep(currentChatId, "second") && totalOutgoing >= 2) {
+          scheduleAutoReply("second");
+        }
+      }
+    }
+  }, 5000);
+}
+
+/* ========= Send message ========= */
+function sendMessage(){
+  const input=document.getElementById("messageInput");
+  const text=input.value.trim();
+  if(!text || !currentChatId) return;
+
+  const msgs=document.getElementById("messages");
   const msgObj = { role: "outgoing", text, ts: Date.now() };
 
-  // Update UI
-  const msgsEl = document.getElementById("messages");
-  msgsEl.appendChild(createMsgElement(msgObj));
+  // UI
+  msgs.appendChild(createMsgElement(msgObj));
 
   // Persist
   addMessage(currentChatId, msgObj);
 
-  // Reset and scroll
-  input.value = "";
-  msgsEl.scrollTop = msgsEl.scrollHeight;
+  // Reset + scroll
+  input.value="";
+  msgs.scrollTop=msgs.scrollHeight;
+
+  // Auto-replies only for online profiles
+  if (currentProfile && currentProfile.online) {
+    const outCount = getMessages(currentChatId).filter(m => m.role === "outgoing").length;
+
+    // Schedule first reply after first user message
+    if (!hasStep(currentChatId, "first") && outCount >= 1) {
+      scheduleAutoReply("first");
+    }
+    // Schedule second reply after second message (only after first is done)
+    else if (hasStep(currentChatId, "first") && !hasStep(currentChatId, "second") && outCount >= 2 && !autoReplyTimer) {
+      scheduleAutoReply("second");
+    }
+  }
 }
 
-// Hide splash after page fully loads
+/* ========= Splash hide ========= */
 window.addEventListener("load", () => {
   const splash = document.getElementById("splash");
   if (splash) {
     setTimeout(() => {
       splash.classList.add("hidden");
-    }, 800); // delay so splash is visible for ~0.8s
+    }, 800);
   }
 });
