@@ -99,6 +99,15 @@ body{
   border-radius:2px;
 }
 
+.typing-indicator {
+  text-align:center;
+  padding:6px 10px;
+  font-size:12px;
+  color:#7a5a00;
+  background:#fff3cd; /* soft amber */
+  border-bottom:1px solid #f0d9a7;
+}
+
 /* Content area */
 .content{
   display:flex;
