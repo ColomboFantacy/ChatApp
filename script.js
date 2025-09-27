@@ -3,7 +3,7 @@ const config = {
   logo: "logo.png",
   background: "background.png",
   profiles: [
-    { id: "p1", name: "Sihilal Nimsara", age: 24, location: "Nugegoda", phone: "+94 70745871", img: "profiles/profile1.png", online: true },
+    { id: "p1", name: "Ashawaree", age: 24, location: "Nugegoda", phone: "+94 70745871", img: "profiles/profile1.png", online: true },
     { id: "p2", name: "Shanika", age: 25, location: "Baththaramulla", phone: "+94 71724899", img: "profiles/profile2.png", online: true },
     { id: "p3", name: "Niluka", age: 29, location: "Wellawatte", phone: "+94 77328556", img: "profiles/profile3.png", online: true },
     { id: "p4", name: "Sheron", age: 31, location: "Rajagiriya", phone: "+94 77728823", img: "profiles/profile4.png", online: true },
@@ -15,6 +15,47 @@ const config = {
     { id: "p10", name: "Thaaru", age: 24, location: "Rathmalana", phone: "+94 77719198", img: "profiles/profile10.png", online: false },
   ]
 };
+
+// Persisted chat storage
+const STORAGE_KEY = "cf_chat_store_v1";
+let currentChatId = null;
+
+function getStore() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+  catch { return {}; }
+}
+function setStore(store) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+}
+function getMessages(profileId) {
+  const store = getStore();
+  return Array.isArray(store[profileId]) ? store[profileId] : [];
+}
+function saveMessages(profileId, messages) {
+  const store = getStore();
+  store[profileId] = messages;
+  setStore(store);
+}
+function addMessage(profileId, msg) {
+  const msgs = getMessages(profileId);
+  msgs.push(msg);
+  saveMessages(profileId, msgs);
+}
+
+function createMsgElement({ role, text }) {
+  const el = document.createElement("div");
+  el.className = "msg " + (role === "outgoing" ? "outgoing" : "incoming");
+  el.textContent = text;
+  return el;
+}
+
+function renderConversation(profileId) {
+  const msgsEl = document.getElementById("messages");
+  msgsEl.innerHTML = "";
+  const msgs = getMessages(profileId);
+  msgs.forEach(m => msgsEl.appendChild(createMsgElement(m)));
+  msgsEl.scrollTop = msgsEl.scrollHeight;
+}
 
 document.addEventListener("DOMContentLoaded", () => {
   const logoImg = document.getElementById("logoImg");
@@ -76,16 +117,26 @@ function setupChatControls(){
   document.getElementById("messageInput").addEventListener("keydown",(e)=>{if(e.key==="Enter")sendMessage();});
 }
 
-function openChat(p){
-  const panel=document.getElementById("chatPanel");
-  document.getElementById("chatAvatar").src=p.img;
-  document.getElementById("chatName").textContent=p.name;
-  document.getElementById("chatMeta").textContent=`Age: ${p.age} · ${p.location}`;
-  const msgs=document.getElementById("messages");
-  msgs.innerHTML="";
-  ["Hi, මම "+p.name,"ඔයාට ඕනේ මොන වගේ සැපක්ද?"].forEach(t=>{
-    const m=document.createElement("div");m.className="msg incoming";m.textContent=t;msgs.appendChild(m);
-  });
+function openChat(p) {
+  currentChatId = p.id;
+
+  const panel = document.getElementById("chatPanel");
+  document.getElementById("chatAvatar").src = p.img;
+  document.getElementById("chatName").textContent = p.name;
+  document.getElementById("chatMeta").textContent = `Age: ${p.age} · ${p.location}`;
+
+  // Seed first-time chat with initial messages
+  let msgs = getMessages(p.id);
+  if (!msgs.length) {
+    msgs = [
+      { role: "incoming", text: "Hi, මම " + p.name, ts: Date.now() },
+      { role: "incoming", text: "ඔයාට ඕනේ මොන වගේ සැපක්ද?", ts: Date.now() }
+    ];
+    saveMessages(p.id, msgs);
+  }
+
+  renderConversation(p.id);
+
   panel.classList.add("show");
   panel.classList.remove("hidden");
 }
@@ -94,16 +145,26 @@ function hideChat(){
   const panel=document.getElementById("chatPanel");
   panel.classList.remove("show");
   setTimeout(()=>panel.classList.add("hidden"),300);
+  currentChatId = null; // optional, just to be explicit
 }
 
-function sendMessage(){
-  const input=document.getElementById("messageInput");
-  const text=input.value.trim();
-  if(!text)return;
-  const msgs=document.getElementById("messages");
-  const m=document.createElement("div");m.className="msg outgoing";m.textContent=text;msgs.appendChild(m);
-  input.value="";
-  msgs.scrollTop=msgs.scrollHeight;
+function sendMessage() {
+  const input = document.getElementById("messageInput");
+  const text = input.value.trim();
+  if (!text || !currentChatId) return;
+
+  const msgObj = { role: "outgoing", text, ts: Date.now() };
+
+  // Update UI
+  const msgsEl = document.getElementById("messages");
+  msgsEl.appendChild(createMsgElement(msgObj));
+
+  // Persist
+  addMessage(currentChatId, msgObj);
+
+  // Reset and scroll
+  input.value = "";
+  msgsEl.scrollTop = msgsEl.scrollHeight;
 }
 
 // Hide splash after page fully loads
@@ -115,4 +176,3 @@ window.addEventListener("load", () => {
     }, 800); // delay so splash is visible for ~0.8s
   }
 });
-
